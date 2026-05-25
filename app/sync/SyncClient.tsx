@@ -561,6 +561,8 @@ interface ProjectRowState {
   isPrimary: boolean;
   plannerProjectId: string | null;  // set for "linked" section
   aliasIds: string[];               // productive IDs merged into this row
+  /** plannerProjectId of an existing linked project to absorb this row as alias */
+  absorbInto: string | null;
 }
 
 const SKIPPED_STORAGE_KEY = "cobe_skipped_project_ids";
@@ -674,6 +676,34 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
     }));
   }
 
+  // Absorb a new/skipped row as an alias into an existing linked project.
+  // Pass targetPlannerProjectId=null to undo the absorption.
+  function absorbIntoLinked(newRowProductiveId: string, targetPlannerProjectId: string | null) {
+    setRows((prev) => {
+      // Find the previous absorption target (if any) to remove from it
+      const existing = prev.find((r) => r.productiveId === newRowProductiveId);
+      const prevTarget = existing?.absorbInto ?? null;
+
+      return prev.map((r) => {
+        // Update the new row itself
+        if (r.productiveId === newRowProductiveId) {
+          return { ...r, absorbInto: targetPlannerProjectId, hidden: !!targetPlannerProjectId, included: true };
+        }
+        // Remove from previous linked target (if switching or clearing)
+        if (prevTarget && r.plannerProjectId === prevTarget) {
+          return { ...r, aliasIds: r.aliasIds.filter((a) => a !== newRowProductiveId) };
+        }
+        // Add to new linked target
+        if (targetPlannerProjectId && r.plannerProjectId === targetPlannerProjectId) {
+          if (!r.aliasIds.includes(newRowProductiveId)) {
+            return { ...r, aliasIds: [...r.aliasIds, newRowProductiveId] };
+          }
+        }
+        return r;
+      });
+    });
+  }
+
   // Helper: union date range for a row (considering its aliasIds)
   function rowDateRange(row: ProjectRowState): { start: string | null; end: string | null } {
     const allIds = [row.productiveId, ...row.aliasIds];
@@ -715,6 +745,7 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
           isPrimary: false,
           plannerProjectId: lp.id,
           aliasIds: lp.aliasIds,
+          absorbInto: null as string | null,
         })),
         // Section 2 / 3: non-linked remote projects (aliases excluded)
         // Default to unchecked — user explicitly picks what to import
@@ -731,6 +762,7 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
             isPrimary: false,
             plannerProjectId: null,
             aliasIds: [] as string[],
+            absorbInto: null as string | null,
           })),
       ];
       setRows(newRows);
@@ -767,6 +799,10 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
     for (const r of toImport) {
       importedAllIds.add(r.productiveId);
       for (const a of r.aliasIds) importedAllIds.add(a);
+    }
+    // Absorbed rows are saved as aliases — don't mark them as skipped
+    for (const r of rows) {
+      if (r.absorbInto) importedAllIds.add(r.productiveId);
     }
     const newlySkipped = rows.filter(
       (r) => filteredIds.has(r.productiveId) && r.section !== "linked" && !importedAllIds.has(r.productiveId)
@@ -857,7 +893,7 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
   function sectionHeader(label: string, count: number, headerClass: string) {
     return (
       <tr key={`hdr-${label}`}>
-        <td colSpan={5} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", headerClass)}>
+        <td colSpan={6} className={cn("px-3 py-2 text-xs font-semibold uppercase tracking-wide", headerClass)}>
           {label} ({count})
         </td>
       </tr>
@@ -928,6 +964,27 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
         {/* Dates (union for grouped/aliased rows) */}
         <td className="px-3 py-2 text-gray-500 whitespace-nowrap text-xs tabular-nums">
           {fmtDate(unionStart)} → {fmtDate(unionEnd)}
+        </td>
+        {/* Action: linked rows show nothing; new/skipped rows can be absorbed into a linked project */}
+        <td className="px-3 py-2">
+          {!isLinked && !row.groupKey && (
+            <select
+              value={row.absorbInto ?? ""}
+              onChange={(e) => absorbIntoLinked(row.productiveId, e.target.value || null)}
+              className="max-w-[180px] rounded border border-gray-200 bg-white px-1.5 py-0.5 text-xs text-gray-500 focus:border-indigo-300 focus:outline-none"
+            >
+              <option value="">New project…</option>
+              <optgroup label="Add as alias to">
+                {rows
+                  .filter((r) => r.section === "linked")
+                  .map((r) => (
+                    <option key={r.plannerProjectId!} value={r.plannerProjectId!}>
+                      {r.name}
+                    </option>
+                  ))}
+              </optgroup>
+            </select>
+          )}
         </td>
       </tr>
     );
@@ -1021,6 +1078,7 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
                   <th className="px-3 py-2 text-left">Project name</th>
                   <th className="px-3 py-2 text-left">Client</th>
                   <th className="px-3 py-2 text-left">Dates</th>
+                  <th className="px-3 py-2 text-left">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -1039,7 +1097,7 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
                 {/* Section 3: previously skipped */}
                 {sections.skipped.length > 0 && (
                   <tr key="hdr-skipped">
-                    <td colSpan={5} className="bg-gray-50 px-3 py-2">
+                    <td colSpan={6} className="bg-gray-50 px-3 py-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                           Previously skipped ({rows.filter(r => r.section === "skipped" && !r.hidden && filteredIds.has(r.productiveId) && (r.groupKey === null || r.isPrimary)).length})
