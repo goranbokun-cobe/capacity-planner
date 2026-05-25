@@ -27,3 +27,10 @@ yarn-error.log*
 
 # Claude Code local settings (contain machine-specific permissions)
 .claude/
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+
+# Nested DB (safety catch-all)
+*.db
+*.db-journal
