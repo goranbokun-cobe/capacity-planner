@@ -193,7 +193,16 @@ export function PeopleEditor({ initialPeople, allSeniorities }: Props) {
   const [isPending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<DialogMode>(null);
   const [expandedPerson, setExpandedPerson] = useState<string | null>(null);
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
   const [apiError, setApiError] = useState<string | null>(null);
+
+  function toggleTeam(teamName: string) {
+    setCollapsedTeams((prev) => {
+      const next = new Set(prev);
+      next.has(teamName) ? next.delete(teamName) : next.add(teamName);
+      return next;
+    });
+  }
 
   const refresh = () => startTransition(() => router.refresh());
 
@@ -265,11 +274,19 @@ export function PeopleEditor({ initialPeople, allSeniorities }: Props) {
         </div>
       ) : (
         <div className="space-y-6">
-          {Object.entries(byTeam).map(([teamName, people]) => (
+          {Object.entries(byTeam).map(([teamName, people]) => {
+            const isCollapsed = collapsedTeams.has(teamName);
+            return (
             <div key={teamName}>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <button
+                onClick={() => toggleTeam(teamName)}
+                className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400 hover:text-gray-600"
+              >
+                {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                 {teamName}
-              </h2>
+                <span className="ml-0.5 normal-case font-normal">({people.length})</span>
+              </button>
+              {!isCollapsed && (
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
@@ -361,8 +378,10 @@ export function PeopleEditor({ initialPeople, allSeniorities }: Props) {
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
