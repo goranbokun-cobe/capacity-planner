@@ -55,12 +55,24 @@ function workingDaysInRange(start: Date, end: Date): number {
  *
  * FTE = fraction of a standard 40h week (8h/day × 5 days).
  */
+export interface BookingPersonInfo {
+  name: string;
+  email: string | null;
+}
+
+export interface FetchBookingsResult {
+  bookings: Map<string, PersonWeekFte[]>;
+  /** Productive person IDs → name + email, for all persons found in booking sideloads */
+  personInfo: Map<string, BookingPersonInfo>;
+}
+
 export async function fetchProjectBookings(
   productiveProjectIds: string[],
   debug?: BookingsDebug
-): Promise<Map<string, PersonWeekFte[]>> {
+): Promise<FetchBookingsResult> {
   const result = new Map<string, PersonWeekFte[]>();
-  if (productiveProjectIds.length === 0) return result;
+  const personInfo = new Map<string, BookingPersonInfo>();
+  if (productiveProjectIds.length === 0) return { bookings: result, personInfo };
 
   // ── Fetch bookings directly per project (filter[project_id] is supported) ──
   // Note: filter[service_id] is NOT supported on /bookings — skip the
@@ -92,7 +104,21 @@ export async function fetchProjectBookings(
         }).catch(() => ({ data: [] as JsonApiResource[], included: [] as JsonApiResource[] }))
       )
     );
-    for (const r of chunkResults) allBookingData.push(...r.data);
+    for (const r of chunkResults) {
+      allBookingData.push(...r.data);
+      // Accumulate person sideloads for name lookups
+      for (const inc of r.included) {
+        if (inc.type === "people" && !personInfo.has(inc.id)) {
+          const attrs = inc.attributes;
+          const firstName = (attrs.first_name as string | null) ?? "";
+          const lastName  = (attrs.last_name  as string | null) ?? "";
+          personInfo.set(inc.id, {
+            name:  `${firstName} ${lastName}`.trim() || inc.id,
+            email: (attrs.email as string | null) ?? null,
+          });
+        }
+      }
+    }
   }
 
   if (debug) {
@@ -101,7 +127,7 @@ export async function fetchProjectBookings(
     debug.bookingsFound = allBookingData.length;
   }
 
-  if (allBookingData.length === 0) return result;
+  if (allBookingData.length === 0) return { bookings: result, personInfo };
 
   // ── Convert bookings → weekly FTE per person ─────────────────────────────
   for (const booking of allBookingData) {
@@ -174,5 +200,5 @@ export async function fetchProjectBookings(
 
   if (debug) debug.rawEntriesFound = [...result.values()].reduce((s, v) => s + v.length, 0);
 
-  return result;
+  return { bookings: result, personInfo };
 }

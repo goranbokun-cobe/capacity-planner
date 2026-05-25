@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { parseISO, isValid } from "date-fns";
 import { getCurrentWeekId, addWeeks, dateToWeekId } from "@/lib/weeks";
 import { fetchActiveProjects } from "@/lib/productive/projects";
-import { fetchProjectBookings, type PersonWeekFte } from "@/lib/productive/bookings";
+import { fetchProjectBookings, type PersonWeekFte, type BookingPersonInfo } from "@/lib/productive/bookings";
 
 /** Preview: fetch active Productive projects + existing planner projects. */
 export async function GET() {
@@ -152,7 +152,7 @@ export async function POST(req: Request) {
 
   const currentWeek = getCurrentWeekId();
   const defaultEnd = addWeeks(currentWeek, 12);
-  const results = { created: 0, updated: 0, deleted: 0, allocationsWritten: 0, unmappedPersonIds: [] as string[], errors: [] as string[] };
+  const results = { created: 0, updated: 0, deleted: 0, allocationsWritten: 0, unmappedPersonIds: [] as string[], unmappedPersonNames: {} as Record<string, string>, errors: [] as string[] };
 
   // ── Delete projects that were unchecked in the linked section ────────────────
   if (deleteIds.length > 0) {
@@ -178,6 +178,7 @@ export async function POST(req: Request) {
   // ── Collect Productive IDs that need booking data ────────────────────────────
   const rowsNeedingBookings = rows.filter((r) => r.importBookings);
   let bookingsMap: Map<string, PersonWeekFte[]> = new Map();
+  let bookingPersonInfo: Map<string, BookingPersonInfo> = new Map();
 
   if (rowsNeedingBookings.length > 0) {
     const allProductiveIds = rowsNeedingBookings.flatMap((r) => [
@@ -185,7 +186,9 @@ export async function POST(req: Request) {
       ...r.aliasIds,
     ]);
     try {
-      bookingsMap = await fetchProjectBookings(allProductiveIds);
+      const fetchResult = await fetchProjectBookings(allProductiveIds);
+      bookingsMap = fetchResult.bookings;
+      bookingPersonInfo = fetchResult.personInfo;
     } catch (err) {
       results.errors.push(`Booking fetch failed: ${String(err)}`);
     }
@@ -281,8 +284,11 @@ export async function POST(req: Request) {
           for (const entry of rawEntries) {
             const seniorityId = personToSeniority.get(entry.productivePersonId);
             if (!seniorityId) {
-              if (!results.unmappedPersonIds.includes(entry.productivePersonId))
+              if (!results.unmappedPersonIds.includes(entry.productivePersonId)) {
                 results.unmappedPersonIds.push(entry.productivePersonId);
+                const info = bookingPersonInfo.get(entry.productivePersonId);
+                if (info) results.unmappedPersonNames[entry.productivePersonId] = info.name;
+              }
               continue;
             }
             const key = `${entry.weekId}::${seniorityId}`;

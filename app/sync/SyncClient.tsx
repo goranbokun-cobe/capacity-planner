@@ -806,7 +806,12 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
       if (result.deleted) parts.push(`Removed ${result.deleted} project(s).`);
       if (importBookings && result.allocationsWritten) parts.push(`Wrote ${result.allocationsWritten} allocation(s).`);
       let text = parts.join(" ") || "Done.";
-      if (result.unmappedPersonIds?.length) text += `\n⚠ ${result.unmappedPersonIds.length} Productive person(s) had no planner match (IDs: ${result.unmappedPersonIds.join(", ")}).`;
+      if (result.unmappedPersonIds?.length) {
+        const names: string[] = result.unmappedPersonIds.map(
+          (id: string) => result.unmappedPersonNames?.[id] ?? id
+        );
+        text += `\n⚠ ${result.unmappedPersonIds.length} person(s) in bookings not found in planner — their allocations were skipped:\n  ${names.join(", ")}\nRun People sync to import missing team members.`;
+      }
       if (hasErrors) text += `\nErrors:\n${result.errors.join("\n")}`;
       setMsg({ type: hasErrors ? "error" : "ok", text });
       if (!hasErrors) setRemoteProjects(null);
