@@ -589,9 +589,6 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
   const [msg, setMsg] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [groupInputVisible, setGroupInputVisible] = useState(false);
   const [groupInputValue, setGroupInputValue] = useState("");
-  // Inline "add alias" input state: productiveId of the row being edited → current typed value
-  const [aliasEditId, setAliasEditId] = useState<string | null>(null);
-  const [aliasInputValue, setAliasInputValue] = useState("");
 
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
 
@@ -897,60 +894,17 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             {isLinked ? (
-              <div className="space-y-1 w-full">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-gray-700">{row.name}</span>
-                  <span className="text-xs text-indigo-500 shrink-0 flex items-center gap-0.5">
-                    <Link2 className="h-3 w-3" /> linked
+              <>
+                <span className="text-sm text-gray-700">{row.name}</span>
+                <span className="text-xs text-indigo-500 shrink-0 flex items-center gap-0.5">
+                  <Link2 className="h-3 w-3" /> linked
+                </span>
+                {groupCount > 0 && (
+                  <span className={cn("shrink-0 rounded border px-1.5 py-0.5 text-xs font-medium", groupColor(row.productiveId))}>
+                    +{groupCount} merged
                   </span>
-                </div>
-                {/* Alias chips + add-alias input */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  <span className="text-xs text-gray-400 font-mono">{row.productiveId}</span>
-                  {row.aliasIds.map((aid) => (
-                    <span key={aid} className="inline-flex items-center gap-0.5 rounded bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-xs font-mono text-indigo-700">
-                      {aid}
-                      <button
-                        onClick={() => patch(row.productiveId, { aliasIds: row.aliasIds.filter((a) => a !== aid) })}
-                        className="text-indigo-400 hover:text-red-500 ml-0.5"
-                        title="Remove alias"
-                      ><X className="h-2.5 w-2.5" /></button>
-                    </span>
-                  ))}
-                  {aliasEditId === row.productiveId ? (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const val = aliasInputValue.trim();
-                        if (val && !row.aliasIds.includes(val) && val !== row.productiveId) {
-                          patch(row.productiveId, { aliasIds: [...row.aliasIds, val] });
-                        }
-                        setAliasEditId(null);
-                        setAliasInputValue("");
-                      }}
-                      className="flex items-center gap-1"
-                    >
-                      <input
-                        autoFocus
-                        type="text"
-                        placeholder="Project ID…"
-                        value={aliasInputValue}
-                        onChange={(e) => setAliasInputValue(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Escape") { setAliasEditId(null); setAliasInputValue(""); } }}
-                        className="w-28 rounded border border-indigo-300 px-1.5 py-0.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                      />
-                      <button type="submit" className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Add</button>
-                      <button type="button" onClick={() => { setAliasEditId(null); setAliasInputValue(""); }} className="text-gray-400 hover:text-gray-600"><X className="h-3 w-3" /></button>
-                    </form>
-                  ) : (
-                    <button
-                      onClick={() => { setAliasEditId(row.productiveId); setAliasInputValue(""); }}
-                      className="text-xs text-gray-400 hover:text-indigo-600 font-medium"
-                      title="Add a Productive project ID as alias"
-                    >+ alias</button>
-                  )}
-                </div>
-              </div>
+                )}
+              </>
             ) : (
               <>
                 {groupCount > 0 && (
