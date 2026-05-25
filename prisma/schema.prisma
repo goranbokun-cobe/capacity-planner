@@ -1,0 +1,172 @@
+// This Prisma schema supports SQLite (local) and PostgreSQL (server).
+// Switch DATABASE_URL to a postgres:// string and change provider to "postgresql" for server mode.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────────────
+// Org structure
+// ────────────────────────────────────────────────────────────────
+
+model Team {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  displayOrder Int       @default(0)
+  archivedAt   DateTime?
+  roles        Role[]
+  createdAt    DateTime  @default(now())
+}
+
+model Role {
+  id           String          @id @default(cuid())
+  teamId       String
+  team         Team            @relation(fields: [teamId], references: [id])
+  name         String
+  displayOrder Int             @default(0)
+  archivedAt   DateTime?
+  seniorities  SeniorityTier[]
+
+  @@unique([teamId, name])
+}
+
+model SeniorityTier {
+  id              String       @id @default(cuid())
+  roleId          String
+  role            Role         @relation(fields: [roleId], references: [id])
+  name            String
+  level           Int
+  defaultCapacity Float        @default(1.0)
+  archivedAt      DateTime?
+  people          Person[]
+  allocations     Allocation[]
+
+  @@unique([roleId, name])
+}
+
+model Person {
+  id                String             @id @default(cuid())
+  seniorityId       String
+  seniority         SeniorityTier      @relation(fields: [seniorityId], references: [id])
+  fullName          String
+  email             String?            @unique
+  baseCapacity      Float              @default(1.0)
+  startDate         DateTime?
+  endDate           DateTime?
+  productiveId      String?            @unique
+  holidayCalendarId String?            // Productive holiday_calendar ID (from current cost rate)
+  archivedAt        DateTime?
+  overrides         CapacityOverride[]
+}
+
+model Holiday {
+  id           String   @id @default(cuid())
+  productiveId String   @unique  // Productive holiday record ID (for idempotent upserts)
+  calendarId   String            // Productive holiday_calendar ID
+  date         DateTime
+  name         String
+
+  @@index([calendarId, date])
+}
+
+model CapacityOverride {
+  id       String  @id @default(cuid())
+  personId String
+  person   Person  @relation(fields: [personId], references: [id])
+  weekId   String
+  capacity Float
+  reason   String?
+  source   String  @default("manual")
+
+  @@unique([personId, weekId])
+}
+
+// ────────────────────────────────────────────────────────────────
+// Projects & allocations
+// ────────────────────────────────────────────────────────────────
+
+model Project {
+  id                  String            @id @default(cuid())
+  name                String
+  clientName          String?
+  status              String            // "pipeline" | "committed" | "running" | "done" | "lost"
+  probability         Int?
+  pipelineCalcMode    String?           // "weighted" | "full" | null (inherit settings)
+  startWeekId         String
+  endWeekId           String
+  productiveDealId    String?           @unique
+  productiveProjectId String?           @unique
+  notes               String?
+  colorTagOverride    String?
+  archivedAt          DateTime?
+  allocations         Allocation[]
+  aliases             ProductiveProjectAlias[]
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+model ProductiveProjectAlias {
+  id                  String   @id @default(cuid())
+  plannerProjectId    String
+  plannerProject      Project  @relation(fields: [plannerProjectId], references: [id], onDelete: Cascade)
+  productiveProjectId String   @unique
+  createdAt           DateTime @default(now())
+
+  @@map("productive_project_aliases")
+}
+
+model Allocation {
+  id          String        @id @default(cuid())
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id])
+  weekId      String
+  seniorityId String
+  seniority   SeniorityTier @relation(fields: [seniorityId], references: [id])
+  fte         Float
+  notes       String?
+  source      String        @default("manual") // "manual" | "productive"
+
+  @@unique([projectId, weekId, seniorityId])
+}
+
+// ────────────────────────────────────────────────────────────────
+// Settings (singleton row, id=1)
+// ────────────────────────────────────────────────────────────────
+
+model PipelineSettings {
+  id              Int    @id @default(1)
+  defaultCalcMode String @default("weighted") // "weighted" | "full"
+  colorBands      String @default("[]")        // JSON array stored as text (SQLite compat)
+}
+
+// ────────────────────────────────────────────────────────────────
+// Snapshots
+// ────────────────────────────────────────────────────────────────
+
+model Snapshot {
+  id      String   @id @default(cuid())
+  label   String
+  takenAt DateTime @default(now())
+  takenBy String?
+  payload String   // JSON blob
+  notes   String?
+}
+
+// ────────────────────────────────────────────────────────────────
+// Productive sync history
+// ────────────────────────────────────────────────────────────────
+
+model SyncJob {
+  id         String    @id @default(cuid())
+  source     String    @default("productive")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  status     String    // "running" | "ok" | "failed"
+  message    String?
+  stats      String?   // JSON
+}

@@ -1,0 +1,29 @@
+# deps
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# prisma
+/prisma/dev.db
+/prisma/dev.db-journal
+
+# env
+.env
+.env.local
+.env.*.local
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+
+# Claude Code local settings (contain machine-specific permissions)
+.claude/
