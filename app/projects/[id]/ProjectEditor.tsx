@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { projectColor, hexToRgba, STATUS_LABELS, type ProjectStatus } from "@/lib/projects";
-import { getWeeksInRange, weekLabel } from "@/lib/weeks";
+import { getWeeksInRange, weekLabel, addWeeks } from "@/lib/weeks";
 import { cn } from "@/lib/utils";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -389,6 +389,18 @@ export function ProjectEditor({
               onChange={(e) => { setStartWeekId(e.target.value); mark(); }}
               placeholder="2026-W24"
             />
+            <div className="mt-1 flex gap-1">
+              <button
+                type="button"
+                onClick={() => { setStartWeekId((w) => addWeeks(w, -4)); mark(); }}
+                className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              >−1 month</button>
+              <button
+                type="button"
+                onClick={() => { setStartWeekId((w) => addWeeks(w, -13)); mark(); }}
+                className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              >−1 quarter</button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">End week</label>
@@ -397,6 +409,18 @@ export function ProjectEditor({
               onChange={(e) => { setEndWeekId(e.target.value); mark(); }}
               placeholder="2026-W36"
             />
+            <div className="mt-1 flex gap-1">
+              <button
+                type="button"
+                onClick={() => { setEndWeekId((w) => addWeeks(w, 4)); mark(); }}
+                className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              >+1 month</button>
+              <button
+                type="button"
+                onClick={() => { setEndWeekId((w) => addWeeks(w, 13)); mark(); }}
+                className="rounded border border-gray-200 px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              >+1 quarter</button>
+            </div>
           </div>
         </div>
 
