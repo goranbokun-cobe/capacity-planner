@@ -521,7 +521,7 @@ function DealsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: (j:
 
       {!deals && !loading && (
         <p className="text-sm text-gray-500">
-          Click "Load from Productive" to preview deals before importing.
+          Click &quot;Load from Productive&quot; to preview deals before importing.
         </p>
       )}
     </div>
@@ -1145,7 +1145,7 @@ function ProjectsTab({ jobs, onJobsRefresh }: { jobs: SyncJob[]; onJobsRefresh: 
       )}
 
       {!remoteProjects && !loading && (
-        <p className="text-sm text-gray-500">Click "Load from Productive" to preview active projects.</p>
+        <p className="text-sm text-gray-500">Click &quot;Load from Productive&quot; to preview active projects.</p>
       )}
     </div>
   );
@@ -1237,7 +1237,7 @@ function TimeOffTab() {
         <div>
           <h3 className="text-sm font-semibold text-gray-700">Public holidays</h3>
           <p className="mt-0.5 text-sm text-gray-500">
-            Reads each employee's holiday calendar from their Productive cost rate and syncs
+            Reads each employee&apos;s holiday calendar from their Productive cost rate and syncs
             public holidays for this year and next. Holidays reduce supply FTE proportionally
             (same as absence — 1 holiday = 1 non-working day in that week).
           </p>
